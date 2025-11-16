@@ -1,0 +1,17 @@
+# Build and runtime artifacts
+build/
+.gradle/
+local.properties
+*.apk
+*.aab
+
+# IDE
+.idea/
+*.iml
+.DS_Store
+
+# Gradle wrapper (optional; usually kept in repo, but excluding here)
+# gradle/wrapper/
+
+# Local SDK path
+android-sdk/

@@ -1,0 +1,12 @@
+<manifest package="com.example.videocutter" xmlns:android="http://schemas.android.com/apk/res/android">
+        <!-- Using app-specific external directories via getExternalFilesDir();
+            no READ/WRITE_EXTERNAL_STORAGE permission required for app-private files. -->
+    <application android:label="VideoCutter" android:allowBackup="true">
+        <activity android:name=".MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>
