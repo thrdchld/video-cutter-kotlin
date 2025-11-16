@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Video Cutter (Native)</title>
+<style>
+body { font-family: system-ui, sans-serif; padding: 16px; background: #f5f6fa; }
+h2 { margin-top: 0; }
+.box { background: #fff; padding: 12px; border-radius: 10px; margin-bottom: 16px; }
+label { font-weight: 600; }
+input, textarea { width: 100%; padding: 8px; margin-top: 6px; margin-bottom: 12px; border-radius: 6px; border: 1px solid #ccc; }
+button { padding: 12px; border-radius: 10px; border: none; background: #0b74ff; color: #fff; font-weight: 600; width: 100%; }
+#log { white-space: pre-wrap; background: #fff; padding: 10px; border-radius: 8px; min-height: 80px; }
+.video-info { font-size: 0.9rem; padding: 4px; color: #555; }
+</style>
+</head>
+
+<body>
+
+<h2>Video Cutter — Native</h2>
+
+<div class="box">
+    <label>Pilih Video</label>
+    <input type="file" id="videoInput" accept="video/*">
+
+    <div id="fileInfo" class="video-info">Belum ada file</div>
+</div>
+
+<div class="box">
+    <label>Timestamp (satu baris = satu range)</label>
+    <textarea id="timestamps" rows="6" placeholder="00:00:05.000 - 00:00:20.500"></textarea>
+</div>
+
+<button id="startBtn">Mulai Proses</button>
+
+<h3>Status</h3>
+<div id="log">Menunggu aksi…</div>
+
+<script>
+// ==== Utilities ====
+
+function parseTimestamp(ts) {
+    // Example: "00:00:05.000 - 00:00:20.500"
+    ts = ts.replace('-->', '-').replace('→', '-')
+    const parts = ts.split('-')
+    if (parts.length < 2) return null;
+
+    return [
+        toSeconds(parts[0].trim()),
+        toSeconds(parts[1].trim())
+    ];
+}
+
+function toSeconds(t) {
+    // support mm:ss, hh:mm:ss, ss.xxx
+    t = t.replace(',', '.');
+    const p = t.split(':');
+    if (p.length === 1) return parseFloat(p[0]) || 0;
+    if (p.length === 2) return parseInt(p[0])*60 + parseFloat(p[1]);
+    if (p.length === 3) return parseInt(p[0])*3600 + parseInt(p[1])*60 + parseFloat(p[2]);
+    return 0;
+}
+
+// ==== UI ====
+
+document.getElementById("videoInput").addEventListener("change", function() {
+    if (this.files.length > 0) {
+        const f = this.files[0];
+        document.getElementById("fileInfo").innerText =
+            `Nama: ${f.name}\nUkuran: ${(f.size/1024/1024).toFixed(2)} MB`;
+    }
+});
+
+document.getElementById("startBtn").addEventListener("click", function() {
+    const fileInput = document.getElementById("videoInput");
+    const tsText   = document.getElementById("timestamps").value.trim();
+    const log = document.getElementById("log");
+
+    if (!fileInput.files || fileInput.files.length === 0) {
+        alert("Pilih file video terlebih dahulu.");
+        return;
+    }
+    if (!tsText) {
+        alert("Masukkan minimal 1 timestamp.");
+        return;
+    }
+
+    const f = fileInput.files[0];
+
+    // Parse timestamps
+    const ranges = [];
+    const lines = tsText.split("\n");
+    for (let line of lines) {
+        if (!line.trim()) continue;
+        const parsed = parseTimestamp(line);
+        if (!parsed || parsed[1] <= parsed[0]) {
+            alert("Format timestamp salah: " + line);
+            return;
+        }
+        ranges.push(parsed);
+    }
+
+    // Catatan penting:
+    // WebView TIDAK SELALU MEMBERIKAN PATH FILE ASLI.
+    // Kita kirim placeholder path untuk native override.
+    const fakePath = f.name; // nanti di Kotlin Anda override dengan SAF
+
+    const payload = {
+        files: [
+            {
+                path: fakePath,
+                ranges: ranges
+            }
+        ]
+    };
+
+    log.innerText = "Mengirim ke native…";
+
+    // Kirim ke Kotlin
+    try {
+        AndroidBridge.startProcess(JSON.stringify(payload));
+    } catch (e) {
+        log.innerText = "ERROR: AndroidBridge tidak ditemukan.\n" +
+                        "Pastikan WebView mengaktifkan addJavascriptInterface.";
+    }
+});
+
+// ==== CALLBACKS dari Native ====
+// Dipanggil dari Kotlin via evaluateJavascript()
+
+window.onNativeStatus = function(status) {
+    const log = document.getElementById("log");
+    log.innerText += `\nStatus: ${status}`;
+};
+
+window.onSegmentDone = function(info) {
+    const log = document.getElementById("log");
+    log.innerText += `\nSelesai: ${info.path}`;
+};
+
+window.onError = function(err) {
+    const log = document.getElementById("log");
+    log.innerText += `\nERROR: ${err.msg}`;
+};
+
+</script>
+
+</body>
+</html>
